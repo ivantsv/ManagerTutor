@@ -4,7 +4,7 @@ ROLE_PROMPT = """You are roleplaying as a real employee in a feedback conversati
 This is a training simulation to help managers practice giving feedback.
 Don't forget to keep a dialogue. Dialogue history is always available for you.
 
-Always talk in russian. Make correct russian sentencies.
+Always talk in russian. Make correct russian sentences.
 
 **Your situation:** {scenario}
 You must act like you a part of this situation. You can take facts from this situation and extend them by your own details.
