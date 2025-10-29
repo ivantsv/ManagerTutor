@@ -1,5 +1,3 @@
-# mentor_core.py
-
 def generate_response(user_text: str) -> str:
     """
     Функция-заглушка, имитирующая работу модели.
