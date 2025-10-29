@@ -1,6 +1,8 @@
 import streamlit as st
 import json
 import os
+from llm_agents.role_agent import RoleAgent
+from llm_agents.prompts.role_prompt import role_prompt_template
 
 st.set_page_config(page_title="ManagerTutor", page_icon="💬", layout="wide")
 
@@ -21,6 +23,8 @@ ranks = {
     70: "Профи 😐",
     100: "Эксперт 👿"
 }
+
+role_agent = RoleAgent()
 
 def metric_text(label: str, value: str):
     """
@@ -72,6 +76,10 @@ with st.sidebar:
 
     if st.button("📊 Прогресс", use_container_width=True):
         st.session_state.page = 'progress'
+        st.rerun()
+
+    if st.button("📝 Информация", use_container_width=True):
+        st.session_state.page = 'info'
         st.rerun()
 
 if st.session_state.page == 'home':
@@ -179,13 +187,16 @@ elif st.session_state.page == 'lesson_view':
 
         if user_input:
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
-            # Здесь будет вызов ИИ-модели
-            ai_response = "Хм, понял... А что конкретно я сделал не так? (это заглушка)"
+            system_prompt = role_prompt_template.format(
+                scenario=lesson['case']['scenario'],
+                ai_role=lesson['case']['ai_role'],
+                skill_name=lesson['case']['skill_name']
+            )
+            ai_response = role_agent.answer(user_message=user_input, system=system_prompt)
             st.session_state.chat_history.append({'role': 'assistant', 'content': ai_response})
             st.rerun()
 
         st.markdown("---")
-        # @TODO
         if len(st.session_state.chat_history) >= 4:
             if st.button("Завершить практику и получить оценку", type="primary", use_container_width=True):
                 st.session_state.lesson_step = 'results'
@@ -269,3 +280,8 @@ elif st.session_state.page == 'progress':
             st.markdown(f"**{lesson_title}**: {score}/100")
     else:
         st.info("Пройдите первый урок, чтобы увидеть прогресс!")
+
+elif st.session_state.page == 'info':
+    st.title("📝 Информация")
+
+    st.markdown("### 🧠 Используемый вендор: Mistral AI")
