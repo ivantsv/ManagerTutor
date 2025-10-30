@@ -1,3 +1,4 @@
+aiogram
 langchain-core
 streamlit
 langchain
