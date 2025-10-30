@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
-mentor = MentorAgent(os.getenv("MISTRAL_API_KEY"))
+user_mentors: dict[int, MentorAgent] = {}
 
 main_reply_keyboard_buttons = [
         ["🌿 Открыть меню", "🧹 Очистить память ментора"],
@@ -25,8 +25,16 @@ main_reply_keyboard = types.ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+def get_or_create_mentor(user_id: int) -> MentorAgent:
+    """Возвращает личного ментора пользователя, создаёт нового при необходимости"""
+    if user_id not in user_mentors:
+        user_mentors[user_id] = MentorAgent(os.getenv("MISTRAL_API_KEY"))
+        logger.info(f"Создан новый ментор для пользователя {user_id}")
+    return user_mentors[user_id]
+
 @dp.message(Command("start"))
 async def start_handler(message: Message):
+    get_or_create_mentor(message.from_user.id)
     await message.answer(
         "Привет 🌿 Я ментор, который поможет мягко разобраться в ситуациях с командой.\n"
         "Опиши, пожалуйста, что случилось 👇",
@@ -43,6 +51,7 @@ async def close_menu(message: Message):
 
 @dp.message(F.text == "🧹 Очистить память ментора")
 async def clear_history(message: Message):
+    mentor = get_or_create_mentor(message.from_user.id)
     mentor.clear_memory()
     await message.answer("Память ментора очищена.", reply_markup=types.ReplyKeyboardRemove())
 
@@ -62,6 +71,8 @@ async def situation_handler(message: Message):
     user_text = message.text.strip()
 
     await message.answer("Секунду, думаю над ответом 🍃...")
+
+    mentor = get_or_create_mentor(message.from_user.id)
 
     response = None
     while True:
