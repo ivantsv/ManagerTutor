@@ -102,6 +102,26 @@ with st.sidebar:
         st.session_state.role_agent = None
         st.rerun()
 
+    st.markdown("---")
+
+    st.markdown(f"""
+        <a href="{os.getenv("TELEGRAM_BOT_URL")}" target="_blank">
+            <button style="
+                width: 100%;
+                padding: 0.5rem 1rem;
+                background-color: #0088cc;
+                color: white;
+                border: none;
+                border-radius: 0.5rem;
+                cursor: pointer;
+                font-size: 1rem;
+                font-weight: 500;
+            ">
+                📱 Открыть в Telegram
+            </button>
+        </a>
+        """, unsafe_allow_html=True)
+
 if st.session_state.page == 'home':
     st.title("Добро пожаловать в ManagerTutor! 👋")
     st.markdown("### Научитесь давать экологичную обратную связь")
@@ -137,7 +157,7 @@ if st.session_state.page == 'home':
     - **Чат с ИИ-ментором**, который поможет решить проблемы
     """)
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🚀 Начать обучение", use_container_width=True, type="primary"):
             st.session_state.page = 'lessons'
@@ -146,6 +166,25 @@ if st.session_state.page == 'home':
         if st.button("🤓 Поговорить с ментором", use_container_width=True, type="primary"):
             st.session_state.page = 'mentor_chat'
             st.rerun()
+    with col3:
+        st.markdown(f"""
+                <a href="{os.getenv("TELEGRAM_BOT_URL")}" target="_blank" style="text-decoration: none;">
+                    <button style="
+                        width: 100%;
+                        padding: 0.5rem 1rem;
+                        background-color: #0088cc;
+                        color: white;
+                        border: none;
+                        border-radius: 0.5rem;
+                        cursor: pointer;
+                        font-size: 1rem;
+                        font-weight: 500;
+                        margin-top: 0;
+                    ">
+                        🤓 Поговорить с ментором в Telegram
+                    </button>
+                </a>
+                """, unsafe_allow_html=True)
 
 elif st.session_state.page == 'lessons':
     st.title("📚 Уроки")
@@ -397,6 +436,25 @@ elif st.session_state.page == 'mentor_chat':
         st.caption("Задавайте вопросы и/или описывайте ситуацию.")
 
     with col2:
+        st.markdown(f"""
+                <a href="{os.getenv("TELEGRAM_BOT_URL")}" target="_blank" style="text-decoration: none;">
+                    <button style="
+                        width: 100%;
+                        padding: 0.5rem 0.75rem;
+                        background-color: #0088cc;
+                        color: white;
+                        border: none;
+                        border-radius: 0.5rem;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                        font-weight: 500;
+                        margin-top: 1rem;
+                    ">
+                        📱 В Telegram
+                    </button>
+                </a>
+                """, unsafe_allow_html=True)
+
         if st.button("🧹 Очистить историю чата", use_container_width=True, type="secondary"):
             st.session_state.mentor_chat_history = []
             if st.session_state.mentor_agent:

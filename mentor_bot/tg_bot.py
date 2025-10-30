@@ -1,24 +1,61 @@
 import asyncio
-from aiogram import Bot, Dispatcher, types
+import os
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import Message
-from mentor_core import generate_response
-from config import BOT_TOKEN
+from llm_agents.mentor_agent import MentorAgent
 import logging
+from dotenv import load_dotenv
 
-logger = logging.Logger(__name__)
+load_dotenv()
 
-bot = Bot(token=BOT_TOKEN)
+logger = logging.getLogger(__name__)
+
+bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
+mentor = MentorAgent(os.getenv("MISTRAL_API_KEY"))
+
+main_reply_keyboard_buttons = [
+        ["🌿 Открыть меню", "🧹 Очистить память ментора"],
+        ["❌ Закрыть меню"]
+    ]
+main_reply_keyboard = types.ReplyKeyboardMarkup(
+    keyboard=[[types.KeyboardButton(text=btn) for btn in row] for row in main_reply_keyboard_buttons],
+    resize_keyboard=True
+)
 
 @dp.message(Command("start"))
 async def start_handler(message: Message):
     await message.answer(
         "Привет 🌿 Я ментор, который поможет мягко разобраться в ситуациях с командой.\n"
-        "Опиши, пожалуйста, что случилось 👇"
+        "Опиши, пожалуйста, что случилось 👇",
+        reply_markup=main_reply_keyboard
     )
 
+@dp.message(Command("menu"))
+async def show_menu(message: Message):
+    await message.answer("Выберите нужное:", reply_markup=main_reply_keyboard)
+
+@dp.message(F.text == "❌ Закрыть меню")
+async def close_menu(message: Message):
+    await message.answer("Меню закрыто.", reply_markup=types.ReplyKeyboardRemove())
+
+@dp.message(F.text == "🧹 Очистить память ментора")
+async def clear_history(message: Message):
+    mentor.clear_memory()
+    await message.answer("Память ментора очищена.", reply_markup=types.ReplyKeyboardRemove())
+
+@dp.message(F.text == "🌿 Открыть меню")
+async def show_inline_keyboard(message: Message):
+    buttons = [[types.InlineKeyboardButton(
+        text="🌐 Перейти на сайт",
+        url="https://managertutor.streamlit.app/")
+    ]]
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    await message.answer("Выберите то, что вам нужно", reply_markup=keyboard)
 
 @dp.message()
 async def situation_handler(message: Message):
@@ -26,16 +63,19 @@ async def situation_handler(message: Message):
 
     await message.answer("Секунду, думаю над ответом 🍃...")
 
-    #!!!!!!!!!!!!!!!!
-    response = generate_response(user_text) # заглушка для будущего аи ответа
-    #!!!!!!!!!!!!!!!!
+    response = None
+    while True:
+        try:
+            response = mentor.answer(user_message=user_text)
+            break
+        except:
+            continue
 
     await message.answer(response)
 
-
 async def main():
     logger.info("Бот запущен")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
     asyncio.run(main())
