@@ -1,3 +1,7 @@
-streamlit
-dotenv
 aiogram
+langchain-core
+streamlit
+langchain
+langchain_ollama
+langchain_mistralai
+dotenv

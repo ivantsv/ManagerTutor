@@ -1,6 +1,14 @@
+import time
+
 import streamlit as st
 import json
 import os
+from llm_agents.role_agent import RoleAgent
+from llm_agents.evaluation_agent import EvaluationAgent
+from llm_agents.mentor_agent import MentorAgent
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(page_title="ManagerTutor", page_icon="💬", layout="wide")
 
@@ -12,8 +20,14 @@ if 'lesson_step' not in st.session_state:
     st.session_state.lesson_step = 'theory'
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
+if 'mentor_chat_history' not in st.session_state:
+    st.session_state.mentor_chat_history = []
 if 'lesson_scores' not in st.session_state:
     st.session_state.lesson_scores = {}
+if 'current_role_agent' not in st.session_state:
+    st.session_state.role_agent = None
+if 'current_mentor_agent' not in st.session_state:
+    st.session_state.mentor_agent = None
 
 ranks = {
     20: "Начинающий 😃",
@@ -60,18 +74,32 @@ with st.sidebar:
 
     if st.button("🏠 Главная", use_container_width=True):
         st.session_state.page = 'home'
+        st.session_state.role_agent = None
+        st.rerun()
+
+    if st.button("🤓 Чат с ментором", use_container_width=True):
+        st.session_state.page = 'mentor_chat'
+        st.session_state.role_agent = None
         st.rerun()
 
     if st.button("📚 Уроки", use_container_width=True):
         st.session_state.page = 'lessons'
+        st.session_state.role_agent = None
         st.rerun()
 
     if st.button("📖 Глоссарий", use_container_width=True):
         st.session_state.page = 'glossary'
+        st.session_state.role_agent = None
         st.rerun()
 
     if st.button("📊 Прогресс", use_container_width=True):
         st.session_state.page = 'progress'
+        st.session_state.role_agent = None
+        st.rerun()
+
+    if st.button("📝 Информация", use_container_width=True):
+        st.session_state.page = 'info'
+        st.session_state.role_agent = None
         st.rerun()
 
 if st.session_state.page == 'home':
@@ -106,11 +134,18 @@ if st.session_state.page == 'home':
     - **Практику с ИИ-собеседником**, который ведёт себя как реальный сотрудник
     - **Объективную оценку** ваших навыков с метриками
     - **Библиотеку ресурсов** для дальнейшего развития
+    - **Чат с ИИ-ментором**, который поможет решить проблемы
     """)
 
-    if st.button("🚀 Начать обучение", use_container_width=True, type="primary"):
-        st.session_state.page = 'lessons'
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🚀 Начать обучение", use_container_width=True, type="primary"):
+            st.session_state.page = 'lessons'
+            st.rerun()
+    with col2:
+        if st.button("🤓 Поговорить с ментором", use_container_width=True, type="primary"):
+            st.session_state.page = 'mentor_chat'
+            st.rerun()
 
 elif st.session_state.page == 'lessons':
     st.title("📚 Уроки")
@@ -130,6 +165,8 @@ elif st.session_state.page == 'lessons':
 
                 if st.button("Начать урок", key=f"lesson_{lesson_name}", use_container_width=True):
                     st.session_state.current_lesson = lesson_name
+                    st.session_state.role_agent = None
+                    st.session_state.eval_agent = None
                     st.session_state.lesson_step = 'theory'
                     st.session_state.chat_history = []
                     st.session_state.page = 'lesson_view'
@@ -166,6 +203,14 @@ elif st.session_state.page == 'lesson_view':
 
         st.info(f"**Ситуация:** {lesson['case']['scenario']}")
 
+        if 'current_role_agent' not in st.session_state or st.session_state.role_agent is None:
+            st.session_state.role_agent = RoleAgent(
+                mistralai_api_key=os.getenv("MISTRAL_API_KEY"),
+                scenario=lesson['case']['scenario'],
+                ai_role=lesson['case']['ai_role'],
+                skill_name=lesson['case']['skill_name']
+            )
+
         st.markdown("### 💬 Разговор с сотрудником")
         st.caption("ИИ-сотрудник будет реагировать на вашу обратную связь. Постарайтесь применить изученную модель.")
 
@@ -179,13 +224,25 @@ elif st.session_state.page == 'lesson_view':
 
         if user_input:
             st.session_state.chat_history.append({'role': 'user', 'content': user_input})
-            # Здесь будет вызов ИИ-модели
-            ai_response = "Хм, понял... А что конкретно я сделал не так? (это заглушка)"
+            with st.chat_message("user"):
+                st.markdown(user_input)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Думаю..."):
+                    while True:
+                        try:
+                            ai_response = st.session_state.role_agent.answer(user_message=user_input)
+                            break
+                        except:
+                            time.sleep(1)
+                            continue
+
+                st.markdown(ai_response)
+
             st.session_state.chat_history.append({'role': 'assistant', 'content': ai_response})
             st.rerun()
 
         st.markdown("---")
-        # @TODO
         if len(st.session_state.chat_history) >= 4:
             if st.button("Завершить практику и получить оценку", type="primary", use_container_width=True):
                 st.session_state.lesson_step = 'results'
@@ -194,26 +251,74 @@ elif st.session_state.page == 'lesson_view':
     elif st.session_state.lesson_step == 'results':
         st.title("📊 Результаты")
 
-        # Здесь будет настоящая оценка от модели
-        score = 75  # заглушка
+        if 'evaluation' not in st.session_state:
+            with st.spinner("Анализирую вашу обратную связь..."):
+                eval_agent = EvaluationAgent(
+                    mistralai_api_key=os.getenv("MISTRAL_API_KEY"),
+                    expected_framework=lesson['case']['skill_name']
+                )
+
+                while True:
+                    try:
+                        evaluation = eval_agent.analyze(st.session_state.chat_history)
+                        break
+                    except:
+                        time.sleep(1)
+                        continue
+
+            st.session_state.evaluation = evaluation
+            st.session_state.lesson_scores[st.session_state.current_lesson] = evaluation['total_score']
+        else:
+            evaluation = st.session_state.evaluation
+
+        score = evaluation['total_score']
         st.session_state.lesson_scores[st.session_state.current_lesson] = score
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Общий балл", f"{score}/100")
+        col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.metric("Конкретность", "8/10")
-        with col3:
-            st.metric("Эмпатия", "7/10")
+            st.metric("Общий балл", f"{score}/100")
 
-        st.markdown("### 💡 Обратная связь от ИИ-тьютора")
-        st.success("**Сильные стороны:**\n- Вы использовали конкретные примеры\n- Тон был уважительным")
-        st.warning(
-            "**Области для развития:**\n- Добавьте больше фокуса на решение\n- Структурируйте обратную связь по модели SBI")
+        st.markdown("---")
+
+        st.markdown("### 📊 Детальная оценка")
+        cols = st.columns(5)
+        metric_names = {
+            'specificity': 'Конкретность',
+            'structure': 'Структура',
+            'empathy': 'Эмпатия',
+            'actionability': 'Действенность',
+            'timing': 'Своевременность'
+        }
+
+        for idx, (metric_key, metric_name) in enumerate(metric_names.items()):
+            with cols[idx]:
+                metric_data = evaluation['metrics'][metric_key]
+                st.metric(metric_name, f"{metric_data['score']}/10")
+                st.caption(metric_data['comment'])
+
+        st.markdown("---")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("### ✅ Сильные стороны")
+            for strength in evaluation['strengths']:
+                st.success(f"• {strength}")
+
+        with col2:
+            st.markdown("### 📈 Области для улучшения")
+            for improvement in evaluation['areas_for_improvement']:
+                st.warning(f"• {improvement}")
+
+        st.markdown("---")
+        st.markdown("### 💡 Пример улучшенной обратной связи")
+        st.info(evaluation['example_feedback'])
 
         if st.button("Вернуться к урокам", use_container_width=True):
             st.session_state.page = 'lessons'
             st.session_state.current_lesson = None
+            st.session_state.current_role_agent = None
+            st.session_state.pop('evaluation', None)
             st.rerun()
 
 elif st.session_state.page == 'glossary':
@@ -269,3 +374,59 @@ elif st.session_state.page == 'progress':
             st.markdown(f"**{lesson_title}**: {score}/100")
     else:
         st.info("Пройдите первый урок, чтобы увидеть прогресс!")
+
+elif st.session_state.page == 'info':
+    st.title("📝 Информация")
+
+    st.markdown("### 🧠 Используемый вендор: Mistral AI")
+
+elif st.session_state.page == 'mentor_chat':
+    st.title("🤓 Чат с ментором")
+
+    st.info("Здесь вы можете получить совет по конкретной ситуации от ИИ-ментора")
+
+    if 'current_mentor_agent' not in st.session_state or st.session_state.mentor_agent is None:
+        st.session_state.mentor_agent = MentorAgent(
+            mistralai_api_key=os.getenv("MISTRAL_API_KEY")
+        )
+
+    col1, col2 = st.columns([4, 1])
+
+    with col1:
+        st.markdown("### 💬 Разговор с ментором")
+        st.caption("Задавайте вопросы и/или описывайте ситуацию.")
+
+    with col2:
+        if st.button("🧹 Очистить историю чата", use_container_width=True, type="secondary"):
+            st.session_state.mentor_chat_history = []
+            if st.session_state.mentor_agent:
+                st.session_state.mentor_agent.clear_memory()
+            st.rerun()
+
+    for msg in st.session_state.mentor_chat_history:
+        if msg['role'] == 'user':
+            st.chat_message("user").markdown(msg['content'])
+        else:
+            st.chat_message("assistant").markdown(msg['content'])
+
+    user_input = st.chat_input("Ваш ответ...")
+
+    if user_input:
+        st.session_state.mentor_chat_history.append({'role': 'user', 'content': user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Думаю..."):
+                while True:
+                    try:
+                        ai_response = st.session_state.mentor_agent.answer(user_message=user_input)
+                        break
+                    except:
+                        time.sleep(1)
+                        continue
+
+            st.markdown(ai_response)
+
+        st.session_state.mentor_chat_history.append({'role': 'assistant', 'content': ai_response})
+        st.rerun()
