@@ -4,8 +4,11 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from mentor_core import generate_response
 from config import BOT_TOKEN
+import logging
 
-bot = Bot(token = BOT_TOKEN)
+logger = logging.Logger(__name__)
+
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
@@ -31,7 +34,7 @@ async def situation_handler(message: Message):
 
 
 async def main():
-    print("🤖 Ментор-бот запущен.")
+    logger.info("Бот запущен")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
